@@ -9,14 +9,30 @@ Source: https://github.com/elias5000/check_aws_budgets
 """
 
 import sys
+from argparse import ArgumentParser
 
 import boto3
-from botocore.exceptions import BotoCoreError
+from botocore.exceptions import BotoCoreError, ClientError
 
 STATE_OK = 0
 STATE_WARN = 1
 STATE_CRIT = 2
 STATE_UNKNOWN = 3
+
+
+def fetch_budget(name):
+    """
+    Fetch single budget from account
+    :param name: budget name
+    :return:
+    """
+    try:
+        caller = boto3.client('sts').get_caller_identity()
+        client = boto3.client('budgets')
+        return client.describe_budget(AccountId=caller['Account'], BudgetName=name)['Budget']
+    except (BotoCoreError, ClientError) as err:
+        print("UNKNOWN - {}".format(err))
+        sys.exit(STATE_UNKNOWN)
 
 
 def fetch_budgets():
@@ -39,26 +55,45 @@ def fetch_budgets():
         sys.exit(STATE_UNKNOWN)
 
 
-def get_overspend():
+def get_overspend(budgets):
     """
     Return budgets with overspend flag as dict
+    :param budgets: list of budgets
     :return:
     """
-    res = {}
-    for budget in fetch_budgets():
+    res = {
+        True: [],
+        False: []
+    }
+    for budget in budgets:
         name = budget['BudgetName']
         limit = float(budget['BudgetLimit']['Amount'])
         forecast = float(budget['CalculatedSpend']['ForecastedSpend']['Amount'])
 
-        res["{}(fcst:{:.2f};limit:{:.2f})".format(name, forecast, limit)] = forecast > limit
+        res[forecast > limit].append("{}(fcst:{:.2f};limit:{:.2f})".format(name, forecast, limit))
     return res
 
 
-if __name__ == '__main__':
-    overspend = get_overspend()
-    if [o for o in overspend.values() if o]:
-        print("Budget forecasts exceed limit: {}".format(', '.join(overspend.keys())))
+def main():
+    """ CLI user interface """
+    parser = ArgumentParser()
+    parser.add_argument('--budget', help='budget name')
+
+    args = parser.parse_args()
+
+    if args.budget:
+        budgets = [fetch_budget(args.budget)]
+    else:
+        budgets = fetch_budgets()
+
+    overspend = get_overspend(budgets)
+    if overspend[True]:
+        print("Budget forecast exceeds limit: {}".format(', '.join(overspend[True])))
         sys.exit(STATE_CRIT)
 
-    print("All budgets within limit: {}".format(', '.join(overspend.keys())))
+    print("Budgets forecast within limit: {}".format(', '.join(overspend[False])))
     sys.exit(STATE_OK)
+
+
+if __name__ == '__main__':
+    main()

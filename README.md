@@ -26,6 +26,9 @@ Authentication is identical to awscli. Use either instance role EC2 or pod role 
 with kube2iam (preferred) or ~/.aws/config profile. The check will use the default profile.
 
 
-## Usage
-The check does not take any arguments in the current version.
-It fetches all budgets of the caller account and checks if their forecast exceeds their configured limit.
+## Commandline Usage
+    usage: check_aws_budgets.py [-h] [--budget BUDGET]
+
+    optional arguments:
+      -h, --help       show this help message and exit
+      --budget BUDGET  budget name
