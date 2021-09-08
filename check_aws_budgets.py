@@ -68,9 +68,14 @@ def get_overspend(budgets):
     for budget in budgets:
         name = budget['BudgetName']
         limit = float(budget['BudgetLimit']['Amount'])
-        forecast = float(budget['CalculatedSpend']['ForecastedSpend']['Amount'])
-
-        res[forecast > limit].append("{}(fcst:{:.2f};limit:{:.2f})".format(name, forecast, limit))
+        try:
+            forecast = float(budget['CalculatedSpend']['ForecastedSpend']['Amount'])
+            res[forecast > limit].append("{}(fcst:{:.2f};limit:{:.2f})".format(
+                name, forecast, limit))
+        except KeyError:
+            actual = float(budget['CalculatedSpend']['ActualSpend']['Amount'])
+            res[actual > limit].append("{}(act:{:.2f};limit:{:.2f})".format(
+                name, actual, limit))
     return res
 
 
